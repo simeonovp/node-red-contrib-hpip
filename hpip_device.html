@@ -1,0 +1,39 @@
+<script type="text/javascript">
+  RED.nodes.registerType('hpip-server', {
+    category: 'Imaging',
+    color: '#3FADB5',
+    defaults: {
+      cfg: { value: '', type: 'hpip-config' },
+      name: { value: '' }
+    },          
+    inputs: 1,
+    outputs: 1,
+    icon: 'switch.png',
+    label: function() { return this.name || 'Image Server'; },
+    inputLabels: 'in',
+    outputLabels: [ 'out' ],
+    align: 'left',
+    oneditprepare: function () {
+    },
+    oneditsave: function() {
+    }
+  });
+</script>
+
+<!-- ======================= HTML ======================= -->
+
+<script type="text/html" data-template-name="hpip-server">
+  <div class="form-row">
+    <label for="node-input-cfg"><i class="fa fa-cog"></i> Device</label>
+    <input type="text" id="node-input-cfg">
+  </div>
+  <div class="form-row">
+    <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Name">
+  </div>
+</script>
+
+<!-- ======================= Help ======================= -->
+
+<script type="text/html" data-help-name="hpip-server">
+</script>

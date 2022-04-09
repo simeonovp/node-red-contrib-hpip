@@ -1,0 +1,24 @@
+<script type="text/javascript">
+  RED.nodes.registerType('hpip-config', {
+    category: 'config',
+    defaults: {
+      ip: { value: '' },
+      port: { value: 0 },
+      name: { value: '' }
+    },
+    label: function() { return this.name || 'HP Config'; },
+  });
+</script>
+
+<!-- ======================= HTML ======================= -->
+
+<script type="text/html" data-template-name="hpip-config">
+</script>
+
+<!-- ======================= Help ======================= -->
+
+<script type="text/html" data-help-name="hpip-config">
+  <p><strong>IP:</strong><br/> The IP of the device.</p>
+  <p><strong>PORT:</strong><br/> The event service port.</p>
+  <p><strong>Name:</strong><br/> The name of the device.</p>
+</script>

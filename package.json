@@ -1,0 +1,35 @@
+{
+	"name": "node-red-contrib-hpip",
+	"version": "0.0.1-beta.1",
+	"description": "Node Red nodes for net designing",
+	"dependencies": {
+		"request": "^2.88.2",
+		"soap": "^0.35.0"
+	},
+	"author": {
+		"name": "Peter Simeonov"
+	},
+	"license": "Apache-2.0",
+	"keywords": [
+		"simeonov",
+		"hp",
+		"mfp",
+		"imaging",
+		"printing",
+		"hpip"
+	],
+	"bugs": {
+		"url": "https://github.com/simeonovp/node-red-contrib-hpip/issues"
+	},
+	"homepage": "https://github.com/simeonovp/node-red-contrib-hpip",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/simeonovp/node-red-contrib-hpip.git"
+	},
+	"node-red": {
+		"nodes": {
+			"hpip-config": "hpip_config.js",
+			"hpip-device": "hpip_device.js"
+		}
+	}
+}
