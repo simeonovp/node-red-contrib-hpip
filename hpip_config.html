@@ -3,7 +3,8 @@
     category: 'config',
     defaults: {
       ip: { value: '' },
-      port: { value: 0 },
+      port: { value: 5357 },
+      sid: { value: '' },
       name: { value: '' }
     },
     label: function() { return this.name || 'HP Config'; },
@@ -13,6 +14,22 @@
 <!-- ======================= HTML ======================= -->
 
 <script type="text/html" data-template-name="hpip-config">
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="icon-tag"></i> Name</label>
+    <input type="text" id="node-config-input-name" placeholder="Name">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-ip"><i class="icon-tag"></i> IP</label>
+    <input type="text" id="node-config-input-ip" placeholder="Name">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-port"><i class="icon-tag"></i> Port</label>
+    <input type="text" id="node-config-input-port" placeholder="Name">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-sid"><i class="icon-tag"></i> Service</label>
+    <input type="text" id="node-config-input-sid" placeholder="Name">
+  </div>
 </script>
 
 <!-- ======================= Help ======================= -->

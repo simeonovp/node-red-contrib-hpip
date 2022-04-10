@@ -1,0 +1,21 @@
+﻿<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:wsoap12="http://schemas.xmlsoap.org/wsdl/soap12/"
+             xmlns:wsdp="http://schemas.xmlsoap.org/ws/2006/02/devprof"
+             xmlns:wsp="http://schemas.xmlsoap.org/ws/2004/09/policy"
+             xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+             xmlns:wscn="http://schemas.microsoft.com/windows/2006/08/wdp/scan"
+             targetNamespace="http://schemas.microsoft.com/windows/2006/08/wdp/scan"
+             name="WSDScanDevice">
+
+    <wsp:Policy wsu:Id="DevicePolicy">
+        <wsdp:Profile />
+    </wsp:Policy>
+
+    <wsdl:portType name="ScanDeviceType" />
+
+    <wsdl:binding name="ScannerSoapBinding" type="wscn:ScanDeviceType" >
+        <wsoap12:binding style="document" transport="http://schemas.xmlsoap.org/soap/http" />
+        <wsp:PolicyReference URI="#DevicePolicy" wsdl:required="true" />
+    </wsdl:binding>
+
+</wsdl:definitions>
