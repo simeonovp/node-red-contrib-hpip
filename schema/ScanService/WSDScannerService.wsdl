@@ -27,6 +27,15 @@
         <xs:schema targetNamespace="http://schemas.microsoft.com/windows/2006/08/wdp/scan">
             <xs:include schemaLocation="WDPScan.xsd"/>
         </xs:schema>
+        <xs:schema targetNamespace="http://schemas.xmlsoap.org/ws/2004/08/eventing" >
+            <xs:include schemaLocation="eventing.xsd" />
+        </xs:schema>
+        <xs:schema targetNamespace="http://www.w3.org/XML/1998/namespace" >
+            <xs:include schemaLocation="xml.xsd" />
+        </xs:schema>
+        <xs:schema targetNamespace="http://schemas.xmlsoap.org/ws/2004/08/addressing" >
+            <xs:include schemaLocation="addressing.xsd" />
+        </xs:schema>
     </types>
 
     <message name="CreateScanJobRequestMsg">
@@ -98,6 +107,12 @@
     </message>
     <message name="JobEndStateEventMsg">
         <part name="body" element="wscn:JobEndStateEvent"/>
+    </message>
+    <message name="SubscribeRequestMsg">
+        <part name='body' element='wse:Subscribe' />
+    </message>
+    <message name="SubscribeResponseMsg">
+        <part name="body" element="wse:SubscribeResponse"/>
     </message>
 
     <portType name="ScannerServiceType" wse:EventSource="true">
@@ -176,6 +191,12 @@
         <operation name="JobEndStateEvent">
             <output message="wscn:JobEndStateEventMsg"
                    wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/JobEndStateEvent" />
+        </operation>
+        <operation name="Subscribe">
+            <input message="wscn:SubscribeRequestMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/Subscribe" />
+            <output message="wscn:SubscribeResponseMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/SubscribeResponse" />
         </operation>
     </portType>
     <binding name="ScannerServiceBinding" type="wscn:ScannerServiceType">
@@ -325,6 +346,17 @@
                 <wsoap12:body use="literal" />
             </output>
         </operation>
+        <operation name="Subscribe">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/Subscribe"
+                soapActionRequired="true" />
+            <input>
+                <wsoap12:body use="literal" />
+            </input>
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
     </binding>
     <service name="ScannerService">
         <port name="ScannerPort" binding="wscn:ScannerServiceBinding">
@@ -332,4 +364,3 @@
         </port>
     </service>
 </definitions>
-

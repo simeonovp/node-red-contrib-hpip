@@ -23,13 +23,22 @@ module.exports = function (RED) {
     onInput (msg, send, done) {
       try {
         if (msg.action) {
-          return this.onAction(msg).then(()=>done()).catch(err=>done(err));
+          return this.onActionAsync(msg)
+            .then((res)=> { 
+              this.log('-- Action done: ' + msg.action); 
+              send(res);
+              done();
+            })
+            .catch(err => {
+              this.log(err.stack || err); 
+              done(err);
+            });
         }
         done();
       }
-      catch(e) { 
-        this.log(e.stack || e); 
-        done(e.stack || e);
+      catch(err) { 
+        this.log(err.stack || err); 
+        done(err.stack || err);
       }
     }
 
@@ -45,11 +54,16 @@ module.exports = function (RED) {
         case 'getScannerStatus':
           return this.getScannerStatus();
         case 'scanSubscribe': {
-          const scanEvents = ['ScanAvailableEvent', 'ScannerStatusSummaryEvent', 'ScannerStatusConditionEvent'];
+          const scanEvents = [
+            'ScanAvailableEvent',  // WDPScan.xsd, Li.177
+            'ScannerStatusSummaryEvent', // WDPScan.xsd, Li.208
+            'ScannerStatusConditionClearedEvent', // WDPScan.xsd, Li.235
+            'ScannerStatusConditionEvent' // WDPScan.xsd, Li.220, 193
+          ];
           if (isNaN(msg.par1)) return done('par1 is not a number');
           const idx = parseInt(msg.par1);
           if ((idx < 0) || (idx > scanEvents.length)) return done(`par1 is out of range [0..${scanEvents.length}]`);
-          return this.scanSubscribe(idx);
+          return this.scanSubscribe(scanEvents[idx]);
         }
         case 'validateScanTicket':
         case 'createScanJob': {
@@ -95,7 +109,7 @@ module.exports = function (RED) {
         Action: 'http://schemas.xmlsoap.org/ws/2004/09/transfer/Get' + operation
       };
       const soapBody = {};
-      return this.cfgNode.soapRequest(wsdl, 'Get', soapHeader, soapBody, (res) => {
+      return this.cfgNode.soapRequest({ wsdl, operation: 'Get', soapHeader, soapBody }, (res) => {
         this.log('-- getXXX');
         const resTemplate = { };
       });
@@ -250,12 +264,13 @@ module.exports = function (RED) {
     }
 
     // Scan
-    _scanSoapRequest(operation, args, cb) {
-      const soapHeader = {
+    _scanSoapRequest(operation, soapHeader, soapBody, cb) {
+      soapHeader = soapHeader || {
         To: this.cfgNode.scanEndpoint,
         Action: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + operation
       };
-      return this.cfgNode.soapRequest(this.cfgNode.scanWsdl, operation, soapHeader, args, cb);
+      const wsdl = this.cfgNode.scanWsdl;
+      return this.cfgNode.soapRequest({ wsdl, operation, soapHeader, soapBody}, cb);
     }
 
     scanSubscribe(scanEvent) {
@@ -267,66 +282,19 @@ module.exports = function (RED) {
           Identifier: urn
         }
       };
-      // const Subscribe1 = {
-      //   EndTo: endpoint,
-      //   Delivery: {
-      //     attributes: {
-      //       Mode: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/DeliveryModes/Push'
-      //     },
-      //     NotifyTo: endpoint
-      //   },
-      //   Expires: 'PT1H',
-      //   Filter: {
-      //     attributes: {
-      //       Dialect: 'http://schemas.xmlsoap.org/ws/2006/02/devprof/Action'
-      //     },
-      //     Filter: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScanAvailableEvent'
-      //   },
-      //   ScanDestinations: [{
-      //     ClientDisplayName: 'Scan to RPi',
-      //     ClientContext: 'Scan'
-      //   }]
-      // };
-      // const Subscribe2 = { // different filter to Subscribe1
-      //   EndTo: endpoint,
-      //   Delivery: {
-      //     attributes: {
-      //       Mode: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/DeliveryModes/Push'
-      //     },
-      //     NotifyTo: endpoint
-      //   },
-      //   Expires: 'PT1H',
-      //   Filter: {
-      //     attributes: {
-      //       Dialect: 'http://schemas.xmlsoap.org/ws/2006/02/devprof/Action'
-      //     },
-      //     Filter: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusSummaryEvent'
-      //   },
-      //   ScanDestinations: [{
-      //     ClientDisplayName: 'Scan to RPi',
-      //     ClientContext: 'Scan'
-      //   }]
-      // };
-      // const Subscribe3 = { // different  to Subscribe1 and Subscribe2
-      //   EndTo: endpoint,
-      //   Delivery: {
-      //     attributes: {
-      //       Mode: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/DeliveryModes/Push'
-      //     },
-      //     NotifyTo: endpoint
-      //   },
-      //   Expires: 'PT1H',
-      //   Filter: {
-      //     attributes: {
-      //       Dialect: 'http://schemas.xmlsoap.org/ws/2006/02/devprof/Action'
-      //     },
-      //     Filter: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionEvent'
-      //   },
-      //   ScanDestinations: [{
-      //     ClientDisplayName: 'Scan to RPi',
-      //     ClientContext: 'Scan'
-      //   }]
-      // };
+
+      // Body.Subscribe.Filter http://schemas.microsoft.com/windows/2006/08/wdp/scan/0 <-- http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusSummaryEvent
+      // Body.Subscribe.ScanDestinations <-- 5 elements
+      
+      // Body.Subscribe.Filter http://schemas.microsoft.com/windows/2006/08/wdp/scan/0 <-- http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionClearedEvent
+      // Body.Subscribe.ScanDestinations <-- undefined
+      
+      // Body.Subscribe.Filter http://schemas.microsoft.com/windows/2006/08/wdp/scan/0 <-- http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionEvent
+      // Body.Subscribe.ScanDestinations <-- undefined
+      
+      // Body.Subscribe.Filter http://schemas.microsoft.com/windows/2006/08/wdp/scan/0 <-- http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerElementsChangeEvent
+      // Body.Subscribe.ScanDestinations <-- undefined
+     
       const SubscribeRequest = {
         EndTo: endpoint,
         Delivery: {
@@ -340,7 +308,7 @@ module.exports = function (RED) {
           attributes: {
             Dialect: 'http://schemas.xmlsoap.org/ws/2006/02/devprof/Action'
           },
-          Filter: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + scanEvent
+          $value: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + scanEvent
         },
         ScanDestinations: [{
           ClientDisplayName: 'Scan to RPi',
@@ -396,9 +364,16 @@ module.exports = function (RED) {
         To: this.cfgNode.scanEndpoint,
         Action: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/Subscribe' // operations = ['Subscribe', 'DeliveryModes/Push', '']
       };
-      return this.cfgNode.soapRequest(this.cfgNode.scanWsdl, 'Subscribe', soapHeader, SubscribeRequest, (res) => {
-        this.log(`-- enter getScannerStatus(${scanEvent}) callback`);
+      return this._scanSoapRequest('Subscribe', soapHeader, SubscribeRequest, (res) => {
+        this.log('-- enter scanSubscribe callback');
         const resTemplate = {
+          "SubscriptionManager": {
+            "Address": "http://192.168.193.209:8018/wsd/scan",
+            "ReferenceParameters": {
+              "Identifier": "uuid:0121e81d-004f-1001-af4b-35303a38313a"
+            }
+          },
+          "Expires": "PT1H"
         };
       });
     }
@@ -410,7 +385,7 @@ module.exports = function (RED) {
         }
       };
 
-      return this._scanSoapRequest('GetScannerElements', GetScannerElementsRequest, (res) => {
+      return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
         this.log('-- enter getScannerDescription callback');
         const resTemplate = {
           "ScannerElements": {
@@ -441,7 +416,7 @@ module.exports = function (RED) {
           Name: 'sca:DefaultScanTicket'
         }
       };
-      return this._scanSoapRequest('GetScannerElements', GetScannerElementsRequest, (res) => {
+      return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
         this.log('-- enter getDefaultScanTicket callback');
         const resTemplate = {
           "ScannerElements": {
@@ -528,7 +503,7 @@ module.exports = function (RED) {
         }
       };
 
-      return this._scanSoapRequest('GetScannerElements', GetScannerElementsRequest, (res) => {
+      return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
         this.log('-- enter getScannerConfiguration callback');
         const resTemplate = {
           "ScannerElements": {
@@ -678,7 +653,7 @@ module.exports = function (RED) {
           Name: 'sca:ScannerStatus'
         }
       };
-      return this._scanSoapRequest('GetScannerElements', GetScannerElementsRequest, (res) => {
+      return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
         this.log('-- enter getScannerStatus callback');
         const resTemplate = {
           "ScannerElements": {
@@ -752,7 +727,7 @@ module.exports = function (RED) {
       const ValidateScanTicketRequest = {
         ScanTicket: ticket
       };
-      return this._scanSoapRequest('ValidateScanTicket', ValidateScanTicketRequest, (res) => {
+      return this._scanSoapRequest('ValidateScanTicket', '', ValidateScanTicketRequest, (res) => {
         this.log('-- enter getScannerStatus callback');
         const resTemplate = {
           "ValidationInfo": {
@@ -830,7 +805,7 @@ module.exports = function (RED) {
       //     }
       //   }
       // };
-      return this._scanSoapRequest('CreateScanJob', CreateScanJobRequest, (res) => {
+      return this._scanSoapRequest('CreateScanJob', '', CreateScanJobRequest, (res) => {
         this.log('-- enter getScannerStatus callback');
         const resTemplate = {
         };

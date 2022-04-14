@@ -30,9 +30,9 @@ module.exports = function (RED) {
       RED.nodes.createNode(this, config);
   
       this.config = config;
-      const ip = config.ip;
-      const port = parseInt(config.port);
-      if (isNaN(port)) {
+      this.ip = config.ip;
+      this.port = parseInt(config.port);
+      if (isNaN(this.port)) {
         this.error('No port for soap server node!');
         this.setStatus('not listening');
         return this.error('Service port not configured');
@@ -46,10 +46,12 @@ module.exports = function (RED) {
       // const wsdl = config.wsdl || fs.existsSync(wsdlPath) && fs.readFileSync(wsdlPath, 'utf8') || '';
       // if (!wsdl) return this.error('Service dscription (WSDL) can\'t be loaded');
 
-      this.printWsdl = path.join(__dirname, 'schema', 'PrintService', 'WSDPrinterService.wsdl'); 
+      this.printWsdl = config.printWsdl || path.join(__dirname, 'schema', 'PrintService', 'WSDPrinterService.wsdl'); 
       if (!this.printWsdl) return this.error('Printer service dscription (WSDL) can\'t be loaded');
-      this.scanWsdl = path.join(__dirname, 'schema', 'ScanService', 'WSDScannerService.wsdl'); 
+      this.scanWsdl = config.scanWsdl || path.join(__dirname, 'schema', 'ScanService', 'WSDScannerService.wsdl'); 
       if (!this.scanWsdl) return this.error('Scanner service dscription (WSDL) can\'t be loaded');
+      this.eventWsdl = config.eventWsdl || path.join(__dirname, 'schema', 'ScanService', 'event.wsdl'); 
+      if (!this.eventWsdl) return this.error('Eventing service dscription (WSDL) can\'t be loaded');
 
       this.on('close', this.onClose.bind(this));
 
@@ -105,7 +107,7 @@ module.exports = function (RED) {
       soap.listen(this.scanServer, path, scannerService, this.scanWsdl);
       
       // Start listening on the HTTP port.
-      this.scanServer.listen(this.port);
+      //++ this.scanServer.listen(this.port); // Error: listen EACCES: permission denied 0.0.0.0:5357
       this.setStatus('listening');
     }
   
@@ -125,10 +127,11 @@ module.exports = function (RED) {
       return Date.now().toString();
     }
 
-    soapRequest(wsdl, operation, soapHeader, soapBody, cb) {
+    soapRequest({wsdl, operation, soapHeader, soapBody, options}, cb) {
       //createClient(url, options, callback);
       return new Promise((resolve, reject) => {
-        soap.createClient(wsdl, { endpoint:this.scanEndpoint, forceSoap12Headers: true }, (err, client) => {
+        options = options || { endpoint:this.scanEndpoint, forceSoap12Headers: true };
+        soap.createClient(wsdl, options, (err, client) => {
           if (err) return reject(err);
           try {
             soapHeader = {
@@ -159,36 +162,6 @@ module.exports = function (RED) {
       });
     }
 
-    soapRequest1(wsdl, operation, soapHeader, soapBody, cb) {
-      //createClient(url, options, callback);
-      soap.createClient(wsdl, { endpoint:this.scanEndpoint, forceSoap12Headers: true }, (err, client) => {
-        if (err) return this.error(err);
-        try {
-          soapHeader = {
-            To: '',
-            Action: '',
-            MessageID: this._messageId(),
-            ReplyTo: { Address: 'http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous' },
-            From: { Address: this.config.id },
-            ...soapHeader
-          };
-          client.addSoapHeader(soapHeader, '', 'wsa');
-          const service = client[operation];
-          if (!service) return this.error('service is ' + service + ' for operation ' + operation);
-          service(soapBody, (err, res) => {
-            if (err) {
-              return this.error(`SOAP client error on ${operation}: ${JSON.stringify(err.root || err, null, 2)}`);
-            }
-            this.log('-- SOAP response: ' + JSON.stringify(res, null, 2));
-            cb(res);
-          });
-        } 
-        catch (err) {
-          this.error(err);
-          this.log('client keys:' + Object.keys(client));
-        }
-      });
-    }
   }
 
   // ======================= Register ======================= 

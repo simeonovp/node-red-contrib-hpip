@@ -14,6 +14,7 @@
     <xs:include schemaLocation="Document.xsd"/>
     <xs:include schemaLocation="Job.xsd"/>
     <xs:include schemaLocation="Scanner.xsd"/>
+    <xs:include schemaLocation="eventing.xsd"/>
 
     <xs:annotation>
         <xs:documentation>
