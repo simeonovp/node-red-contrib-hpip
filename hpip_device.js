@@ -42,7 +42,7 @@ module.exports = function (RED) {
       }
     }
 
-    onAction(msg) {
+    onActionAsync(msg) {
       this.log('onAction: ' + msg.action);
       switch(msg.action) {
         case 'getScannerDescription': 
@@ -83,7 +83,6 @@ module.exports = function (RED) {
       }
     }
 
-
     onStatus(status) {
       this.log('-- onStatus: ' + status);
       switch(status) {
@@ -102,22 +101,30 @@ module.exports = function (RED) {
     }
 
     getXXX(){
-      const devId = 'urn:uuid:16a65700-007c-1000-bb49-508140d0206b';
-      const wsdl = '';
-      const soapHeader = {
-        To: devId,
-        Action: 'http://schemas.xmlsoap.org/ws/2004/09/transfer/Get' + operation
+      const devId = 'urn:uuid:16a65700-007c-1000-bb49-508140d0206b'; //???
+      const pars = {
+        wsdl: '',
+        operation: 'Get',
+        soapHeader: {
+          To: devId,
+          Action: 'http://schemas.xmlsoap.org/ws/2004/09/transfer/Get'
+        },
+        soapBody: {},
+        options: { 
+          endpoint: this.cfgNode.deviceUrl + 'wsd', 
+          forceSoap12Headers: true 
+        }
       };
-      const soapBody = {};
-      return this.cfgNode.soapRequest({ wsdl, operation: 'Get', soapHeader, soapBody }, (res) => {
+      return this.cfgNode.soapRequest(pars, (res) => {
         this.log('-- getXXX');
         const resTemplate = { };
       });
     }
+
     // Pritnt
     printSubscribe() {
       const service = 'd9529a80-208a-4b89-9317-5881fec6b809';
-      const address = `http://${this.cfgNode.ip}:${this.cfgNode.port}/${service}`;
+      const address = this.cfgNode.serviceUrl && (this.cfgNode.serviceUrl + service);
       const urn = 'urn:uuid:7e91ee16-95ad-49da-b410-7d44ba7a64af';
       const endpoint = {
         Address: address,
@@ -263,18 +270,33 @@ module.exports = function (RED) {
       };
     }
 
-    // Scan
     _scanSoapRequest(operation, soapHeader, soapBody, cb) {
-      soapHeader = soapHeader || {
-        To: this.cfgNode.scanEndpoint,
-        Action: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + operation
+      const endpoint = this.cfgNode.deviceUrl + 'wsd/scan';
+      // soapHeader = {
+      //   To: endpoint,
+      //   Action: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + operation,
+      //   ...soapHeader
+      // };
+      const pars = {
+        wsdl: this.cfgNode.scanWsdl,
+        operation,
+        soapHeader: {
+          To: endpoint,
+          Action: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + operation,
+          ...soapHeader
+        },
+        soapBody,
+        options: { 
+          endpoint, 
+          forceSoap12Headers: true 
+        }
       };
-      const wsdl = this.cfgNode.scanWsdl;
-      return this.cfgNode.soapRequest({ wsdl, operation, soapHeader, soapBody}, cb);
+
+      return this.cfgNode.soapRequest(pars, cb);
     }
 
     scanSubscribe(scanEvent) {
-      const address = `http://${this.cfgNode.ip}:${this.cfgNode.port}/${scanEvent}`;
+      const address = this.cfgNode.serviceUrl && (this.cfgNode.serviceUrl + scanEvent);
       const urn = 'urn:uuid:ea73374e-9162-43ab-ad98-d13381fb5457';
       const endpoint = {
         Address: address,
@@ -361,7 +383,7 @@ module.exports = function (RED) {
       //   }
       // };
       const soapHeader = {
-        To: this.cfgNode.scanEndpoint,
+        // To: this.cfgNode.scanEndpoint,
         Action: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/Subscribe' // operations = ['Subscribe', 'DeliveryModes/Push', '']
       };
       return this._scanSoapRequest('Subscribe', soapHeader, SubscribeRequest, (res) => {

@@ -2,10 +2,13 @@
   RED.nodes.registerType('hpip-config', {
     category: 'config',
     defaults: {
-      ip: { value: '' },
-      port: { value: 5357 },
-      sid: { value: '' },
-      name: { value: '' }
+      name: { value: '' },
+      devIp: { value: '' },
+      devPort: { value: 8018 },
+      srvIp: { value: '' },
+      srvPort: { value: 5357 },
+      printWsdl: { value: '' },
+      scanWsdl: { value: '' }
     },
     label: function() { return this.name || 'HP Config'; },
   });
@@ -19,23 +22,39 @@
     <input type="text" id="node-config-input-name" placeholder="Name">
   </div>
   <div class="form-row">
-    <label for="node-config-input-ip"><i class="icon-tag"></i> IP</label>
-    <input type="text" id="node-config-input-ip" placeholder="Name">
+    <label for="node-config-input-devIp"><i class="icon-tag"></i> Device Host/IP</label>
+    <input type="text" id="node-config-input-devIp">
   </div>
   <div class="form-row">
-    <label for="node-config-input-port"><i class="icon-tag"></i> Port</label>
-    <input type="text" id="node-config-input-port" placeholder="Name">
+    <label for="node-config-input-devPort"><i class="icon-tag"></i> Device Port</label>
+    <input type="text" id="node-config-input-devPort" placeholder="8018">
   </div>
   <div class="form-row">
-    <label for="node-config-input-sid"><i class="icon-tag"></i> Service</label>
-    <input type="text" id="node-config-input-sid" placeholder="Name">
+    <label for="node-config-input-srvIp"><i class="icon-tag"></i> Service IP</label>
+    <input type="text" id="node-config-input-srvIp" placeholder="(optional)">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-srvPort"><i class="icon-tag"></i> Service Port</label>
+    <input type="text" id="node-config-input-srvPort" placeholder="5357">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-printWsdl"><i class="icon-tag"></i> Printer WSDL</label>
+    <input type="text" id="node-config-input-printWsdl" placeholder="(optional)">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-scanWsdl"><i class="icon-tag"></i> Scanner WSDL</label>
+    <input type="text" id="node-config-input-scanWsdl" placeholder="(optional)">
   </div>
 </script>
 
 <!-- ======================= Help ======================= -->
 
 <script type="text/html" data-help-name="hpip-config">
-  <p><strong>IP:</strong><br/> The IP of the device.</p>
-  <p><strong>PORT:</strong><br/> The event service port.</p>
   <p><strong>Name:</strong><br/> The name of the device.</p>
+  <p><strong>Device Host/IP:</strong><br/> The hostname or IP of the device.</p>
+  <p><strong>Device Port:</strong><br/> The port of the device.</p>
+  <p><strong>Service IP:</strong><br/> The IP of the service which handle the device events.</p>
+  <p><strong>Service Port:</strong><br/> The port of the service which handle the device events.</p>
+  <p><strong>Printer WSDL:</strong><br/> Url or path of the printer WSDL.</p>
+  <p><strong>Scanner WSDL:</strong><br/> Url or path of the scanner WSDL.</p>
 </script>
