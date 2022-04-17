@@ -4,7 +4,7 @@ module.exports = function (RED) {
   const path = require('path');
   const soap = require('soap');
   const http = require('http');
-  
+ 
 //scan client keys:
 //_events,_eventsCount,_maxListeners,wsdl,streamAllowed,returnSaxStream,normalizeNames,overridePromiseSuffix,
 //CreateScanJob,CreateScanJobAsync,
@@ -52,7 +52,7 @@ module.exports = function (RED) {
       this.on('close', this.onClose.bind(this));
 
       this.status = '';
-      this.scanServer;
+      this.httpServer;
       this.startScanServer();
       this.log('HPIP server crated');
     }
@@ -73,58 +73,49 @@ module.exports = function (RED) {
     }
 
     startScanServer() {
-      const path = 'scannerService'; //'/84e50873-9d2b-4d90-837c-31daeff8396f';
-      //???
-      // const scanAvailableEvent = {
-      //   ScanAvailableEvent: {
-      //     ClientContext: 'Scan',
-      //     ScanIdentifier: '583ea42a-8ab2-be4b-22b4-a7a46877aef5',
-      //     InputSource: 'Platen'
-      //   }
-      // }
+      const path = '/IPToolService/'; //'/84e50873-9d2b-4d90-837c-31daeff8396f';
+      this.httpServer = http.createServer();
+      this.httpServer.listen(this.srvPort); // Error on Windows for ports lower then 10000: listen EACCES: permission denied 0.0.0.0:5357
 
-      // const printerService = {
-      //   PrinterService: {
-      //     PrinterServiceBinding: {
-      //       // handler function for an incoming SOAP request
-      //       // <operation name="PrinterElementsChangeEvent">
-      //       //     <wsoap12:operation
-      //       //         soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/print/PrinterElementsChangeEvent"
-      //       //         soapActionRequired="true" />
-      //       //     <output>
-      //       //         <wsoap12:body use="literal" />
-      //       //     </output>
-      //       // </operation>
-      //       PrinterElementsChangeEvent: function(args, soapResponseCallback) {
-      //         const ElementChanges = args.ElementChanges;
-      //         const PrinterConfiguration = ElementChanges && PrinterConfiguration;
-      //         this.send({
-      //           payload,
-      //           soapResponseCallback
-      //         });
-      //       }
-      //     }
-      //   }
-      // }
+      const ScanAvailableEvent = (args, methodCallback, headers, req) => { //methodCallback(error, result)
+        this.log(`-- enter ScanAvailableEvent: ${JSON.stringify(args)}`); //sip--
+        // args = {
+        //   ClientContext: 'Scan',
+        //   ScanIdentifier: '583ea42a-8ab2-be4b-22b4-a7a46877aef5',
+        //   InputSource: 'Platen'
+        // };
+      };
+      const ScannerStatusSummaryEvent = (args) => { };
+      const ScannerStatusConditionClearedEvent = (args) => { };
+      const ScannerStatusConditionEvent = (args) => { };
 
-      const scannerService = {
+      // method = services[serviceName][portName][methodName];
+      const services = {
+        IPToolService: {
+          IPToolPort: {
+            ScanAvailableEvent,
+            ScannerStatusSummaryEvent,
+            ScannerStatusConditionClearedEvent,
+            ScannerStatusConditionEvent
+          }
+        }
       }
-      //--this.scanServer = new HPIPServer(srvPort, scanWsdl, scannerService);
-      this.scanServer = http.createServer((request, response) => {
-        this.log('-- HTTP server request');
-        response.end('404: Not found: ' + request.url);
-      });
   
-      soap.listen(this.scanServer, path, scannerService, this.scanWsdl);
-      
-      // Start listening on the HTTP port.
-      //++ this.scanServer.listen(this.srvPort); // Error: listen EACCES: permission denied 0.0.0.0:5357
-      this.setStatus('listening');
+      //Usage:
+      //1. listen(server: ServerType, path: string, services: IServices, wsdl: string, callback?: (err: any, res: any) => void): Server;
+      //2. listen(server: ServerType, options: IServerOptions): Server;
+      fs.readFile(this.scanWsdl, 'utf8', (err, xml) => {
+        if (err) return this.error(`Error on open WSDL in startScanServer: ${err}`);
+        const options = { path, services, xml, uri: this.scanWsdl };
+        const server = soap.listen(this.httpServer, options);
+        server.log = console.log; //--
+        this.setStatus('listening');
+      });        
     }
 
     onClose(done) {
       this.setStatus('stopping');
-      this.scanServer && this.scanServer.close(done) || done();
+      this.httpServer && this.httpServer.close(done) || done();
       this.removeAllListeners('hpip_status');
     }
 

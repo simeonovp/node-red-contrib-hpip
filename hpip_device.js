@@ -37,7 +37,7 @@ module.exports = function (RED) {
         done();
       }
       catch(err) { 
-        this.log(err.stack || err); 
+        this.error('In onInput: ' + (err.stack || err)); 
         done(err.stack || err);
       }
     }
@@ -272,11 +272,6 @@ module.exports = function (RED) {
 
     _scanSoapRequest(operation, soapHeader, soapBody, cb) {
       const endpoint = this.cfgNode.deviceUrl + 'wsd/scan';
-      // soapHeader = {
-      //   To: endpoint,
-      //   Action: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + operation,
-      //   ...soapHeader
-      // };
       const pars = {
         wsdl: this.cfgNode.scanWsdl,
         operation,
@@ -296,8 +291,8 @@ module.exports = function (RED) {
     }
 
     scanSubscribe(scanEvent) {
-      const address = this.cfgNode.serviceUrl && (this.cfgNode.serviceUrl + scanEvent);
-      const urn = 'urn:uuid:ea73374e-9162-43ab-ad98-d13381fb5457';
+      const address = this.cfgNode.serviceUrl && (this.cfgNode.serviceUrl + 'IPToolService');
+      const urn = 'serv_' + Date.now().toString(); //'urn:uuid:ea73374e-9162-43ab-ad98-d13381fb5457';
       const endpoint = {
         Address: address,
         ReferenceParameters: {
@@ -332,56 +327,13 @@ module.exports = function (RED) {
           },
           $value: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/' + scanEvent
         },
-        ScanDestinations: [{
-          ClientDisplayName: 'Scan to RPi',
-          ClientContext: 'Scan'
-        }]
+        ScanDestinations: {
+          ScanDestination: {
+            ClientDisplayName: 'Scan to RPi',
+            ClientContext: 'Scan'
+          }
+        }
       };
-      // const req = {
-      //   Subscribe: {
-      //     EndTo: endpoint,
-      //     Delivery: endpoint,
-      //     Expires: 'PT1H',
-      //     Filter: 'http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScanAvailableEvent',
-      //     ScanDestinations: [{
-      //       ClientDisplayName: 'Scan to tati-lap',
-      //       ClientContext: 'Scan'
-      //     }, {
-      //       ClientDisplayName: 'Scan for Print to tati-lap',
-      //       ClientContext: 'ScanToPrint'
-      //     }, {
-      //       ClientDisplayName: 'Scan for E-mail to tati-lap',
-      //       ClientContext: 'ScanToEmailv'
-      //     }]
-      //   }
-      // };
-      // const res = {
-      //   SubscribeResponse: {
-      //     SubscriptionManager: {
-      //         Address: 'http://192.168.193.209:8018/wsd/print',
-      //         ReferenceParameters: {
-      //           Identifier: urn2
-      //       }
-      //     },
-      //     Expires: 'PT1H',
-      //     DestinationResponses: [{
-      //       ClientContext: 'Scan',
-      //       DestinationToken: 'Client_2297848483138'
-      //     }, {
-      //       ClientContext: 'ScanToPrint',
-      //       DestinationToken: 'Client_5523260015893'
-      //     }, {
-      //       ClientContext: 'ScanToEmail',
-      //       DestinationToken: 'Client_9164573940189'
-      //     }, {
-      //       ClientContext: 'ScanToFax',
-      //       DestinationToken: 'Client_9691540273539'
-      //     }, {
-      //       ClientContext: 'ScanToOCR',
-      //       DestinationToken: 'Client_9035465982348'
-      //     }]
-      //   }
-      // };
       const soapHeader = {
         // To: this.cfgNode.scanEndpoint,
         Action: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/Subscribe' // operations = ['Subscribe', 'DeliveryModes/Push', '']
