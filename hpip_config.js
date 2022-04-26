@@ -5,29 +5,6 @@ module.exports = function (RED) {
   const soap = require('soap');
   const http = require('http');
  
-//scan client keys:
-//_events,_eventsCount,_maxListeners,wsdl,streamAllowed,returnSaxStream,normalizeNames,overridePromiseSuffix,
-//CreateScanJob,CreateScanJobAsync,
-//RetrieveImage,RetrieveImageAsync,
-//CancelJob,CancelJobAsync,
-//ValidateScanTicket,ValidateScanTicketAsync,
-//GetScannerElements,GetScannerElementsAsync,
-//GetJobElements,GetJobElementsAsync,
-//GetActiveJobs,GetActiveJobsAsync,
-//GetJobHistory,GetJobHistoryAsync,
-//ScanAvailableEvent,ScanAvailableEventAsync,
-//ScannerElementsChangeEvent,ScannerElementsChangeEventAsync,
-//ScannerStatusSummaryEvent,ScannerStatusSummaryEventAsync,
-//ScannerStatusConditionEvent,ScannerStatusConditionEventAsync,
-//ScannerStatusConditionClearedEvent,ScannerStatusConditionClearedEventAsync,
-//JobStatusEvent,JobStatusEventAsync,
-//JobEndStateEvent,JobEndStateEventAsync,
-//ScannerService,
-//httpClient
-
-//eventing client keys:
-//_events,_eventsCount,_maxListeners,wsdl,streamAllowed,returnSaxStream,normalizeNames,overridePromiseSuffix,httpClient,soapHeaders
-
   class HpDeviceConfigNode {
     constructor(config) {
       RED.nodes.createNode(this, config);
@@ -42,6 +19,8 @@ module.exports = function (RED) {
       this.devIp = config.devIp;
       if (!this.devIp) return this.error('Device ip not configured');
       this.devPort = config.devPort && parseInt(config.devPort) || 8018;
+      this.cachePath = config.cachePath || path.join(__dirname, 'cache');
+      if (!fs.existsSync(this.cachePath)) fs.mkdirSync(this.cachePath, { recursive: true });
      
       this.printWsdl = config.printWsdl || path.join(__dirname, 'schema', 'PrintService', 'WSDPrinterService.wsdl'); 
       if (!this.printWsdl) return this.error('Printer service dscription (WSDL) can\'t be loaded');
@@ -77,17 +56,17 @@ module.exports = function (RED) {
       this.httpServer = http.createServer();
       this.httpServer.listen(this.srvPort); // Error on Windows for ports lower then 10000: listen EACCES: permission denied 0.0.0.0:5357
 
-      const ScanAvailableEvent = (args, methodCallback, headers, req) => { //methodCallback(error, result)
-        this.log(`-- enter ScanAvailableEvent: ${JSON.stringify(args)}`); //sip--
-        // args = {
-        //   ClientContext: 'Scan',
-        //   ScanIdentifier: '583ea42a-8ab2-be4b-22b4-a7a46877aef5',
-        //   InputSource: 'Platen'
-        // };
+      const ScanAvailableEvent = (args, methodCallback, headers, req) => {
+        try {
+          this.emit('hpip_event', 'ScanAvailableEvent', args);
+        }
+        catch (err) {
+          this.error(' Crash in ScanAvailableEvent: ' + err);
+        }
       };
-      const ScannerStatusSummaryEvent = (args) => { };
-      const ScannerStatusConditionClearedEvent = (args) => { };
-      const ScannerStatusConditionEvent = (args) => { };
+      const ScannerStatusSummaryEvent = (args) => { this.emit('hpip_event', 'ScannerStatusSummaryEvent', args) };
+      const ScannerStatusConditionClearedEvent = (args) => { this.emit('hpip_event', 'ScannerStatusConditionClearedEvent', args) };
+      const ScannerStatusConditionEvent = (args) => { this.emit('hpip_event', 'ScannerStatusConditionEvent', args) };
 
       // method = services[serviceName][portName][methodName];
       const services = {
@@ -116,6 +95,7 @@ module.exports = function (RED) {
     onClose(done) {
       this.setStatus('stopping');
       this.httpServer && this.httpServer.close(done) || done();
+      this.removeAllListeners('hpip_event');
       this.removeAllListeners('hpip_status');
     }
 
@@ -146,9 +126,11 @@ module.exports = function (RED) {
             client.addSoapHeader(soapHeader, '', 'wsa');
             //srvIp TODO
             client.on('request', (xml, eid)=>{
-              this.log(`-- on request, xml: ${xml}, eid: ${eid}`);
+              // this.log(`-- on request, xml: ${xml}, eid: ${eid}`);
             });
-            // client.on('response', (body, response, eid)=>{});
+            client.on('response', (body, response, eid)=>{
+              const attachment = body;
+            });
             // client.on('message', (message, eid)=>{});
             // client.on('soapError', (error, eid)=>{});
             const service = client[operation];
@@ -156,12 +138,12 @@ module.exports = function (RED) {
               this.log('client keys:' + Object.keys(client));
               return reject('service is ' + service + ' for operation ' + operation);
             }
-            service(soapBody, (err, res) => {
+            service(soapBody, (err, res, body, header, xml, attachments) => { //error, response, body, undefined, xml, response.mtomResponseAttachments
               if (err) {
                 return reject(`SOAP client error on ${operation}: ${JSON.stringify(err.root || err, null, 2)}`);
               }
-              this.log('-- SOAP response: ' + JSON.stringify(res, null, 2));
-              cb(res);
+              // this.log('-- SOAP response: ' + JSON.stringify(res, null, 2));
+              cb(res, attachments);
               resolve(res);
             });
           } 

@@ -8,7 +8,8 @@
       srvIp: { value: '' },
       srvPort: { value: 5357 },
       printWsdl: { value: '' },
-      scanWsdl: { value: '' }
+      scanWsdl: { value: '' },
+      cachePath: { value: '' }
     },
     label: function() { return this.name || 'HP Config'; },
   });
@@ -45,6 +46,10 @@
     <label for="node-config-input-scanWsdl"><i class="icon-tag"></i> Scanner WSDL</label>
     <input type="text" id="node-config-input-scanWsdl" placeholder="(optional)">
   </div>
+  <div class="form-row">
+    <label for="node-config-input-cachePath"><i class="icon-tag"></i> Cache path</label>
+    <input type="text" id="node-config-input-cachePath" placeholder="(optional)">
+  </div>
 </script>
 
 <!-- ======================= Help ======================= -->
@@ -57,4 +62,5 @@
   <p><strong>Service Port:</strong><br/> The port of the service which handle the device events.</p>
   <p><strong>Printer WSDL:</strong><br/> Url or path of the printer WSDL.</p>
   <p><strong>Scanner WSDL:</strong><br/> Url or path of the scanner WSDL.</p>
+  <p><strong>Cache path:</strong><br/> Path to cache for the scanned documents.</p>
 </script>

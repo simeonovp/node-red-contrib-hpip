@@ -1,5 +1,7 @@
 module.exports = function (RED) {
   'use strict'
+  const fs = require('fs');
+  const path = require('path');
   
   class HpDeviceNode {
     constructor(config, prefix) {
@@ -9,13 +11,37 @@ module.exports = function (RED) {
       this.cfgNode = config.cfg && RED.nodes.getNode(config.cfg);
       if (!this.cfgNode) return this.error(`cfgNode not defined, config.cfg:${config.cfg}`);
 
+      this.docDir = config.docDir;
+      if (this.docDir && !fs.existsSync(this.docDir)) {
+        fs.mkdirSync(this.docDir, { recursive: true });
+        this.log('Create folder for scanned documents ' + this.docDir);
+      }
+
+      this.name = config.name || 'Scan Server';
+
+      this.destinationTokens = {};
+
       this.on('close', this.onClose.bind(this));
       this.on('input', this.onInput.bind(this));
       this.onStatus(this.cfgNode.status);
       this.cfgNode.addListener('hpip_status', this.onStatus.bind(this));
+      this.cfgNode.addListener('hpip_event', this.onEvent.bind(this));
     }
 
+    get scanEvents() { return  [
+      'ScanAvailableEvent',  // WDPScan.xsd, Li.177
+      'ScannerStatusSummaryEvent', // WDPScan.xsd, Li.208
+      'ScannerStatusConditionClearedEvent', // WDPScan.xsd, Li.235
+      'ScannerStatusConditionEvent', // WDPScan.xsd, Li.220, 193
+      'ScannerElementsChangeEvent',
+      'JobStatusEvent',
+      'JobEndStateEventMsg'
+    ]; }
+
+    get jobInformations() { return ['Scanning in auto mode..', 'Scanning from platen..', 'Scanning from ADF..']; }
+
     onClose(done) {
+      this.cfgNode.removeListener('hpip_event', this.onEvent.bind(this));
       this.cfgNode.removeListener('hpip_status', this.onStatus.bind(this));
       done();
     }
@@ -54,27 +80,23 @@ module.exports = function (RED) {
         case 'getScannerStatus':
           return this.getScannerStatus();
         case 'scanSubscribe': {
-          const scanEvents = [
-            'ScanAvailableEvent',  // WDPScan.xsd, Li.177
-            'ScannerStatusSummaryEvent', // WDPScan.xsd, Li.208
-            'ScannerStatusConditionClearedEvent', // WDPScan.xsd, Li.235
-            'ScannerStatusConditionEvent' // WDPScan.xsd, Li.220, 193
-          ];
           if (isNaN(msg.par1)) return done('par1 is not a number');
           const idx = parseInt(msg.par1);
-          if ((idx < 0) || (idx > scanEvents.length)) return done(`par1 is out of range [0..${scanEvents.length}]`);
-          return this.scanSubscribe(scanEvents[idx]);
+          if ((idx < 0) || (idx > this.scanEvents.length)) return done(`par1 is out of range [0..${this.scanEvents.length}]`);
+          return this.scanSubscribe(this.scanEvents[idx]);
+        }
+        case 'scanSubscribeAll': {
+          //TODO
         }
         case 'validateScanTicket':
         case 'createScanJob': {
           const inputSources = ['', 'Platen', 'ADF'];
-          const jobInformations = ['Scanning in auto mode..', 'Scanning from platen..', 'Scanning from ADF..'];
           if (isNaN(msg.par1)) return done('par1 is not a number');
           const idx = parseInt(msg.par1);
           if ((idx < 0) || (idx > inputSources.length)) return done(`par1 is out of range [0..${inputSources.length}]`);
-          const ticket = this._getScanTicket(inputSources[idx], jobInformations[idx]);
+          const ticket = this._getScanTicket(inputSources[idx], this.jobInformations[idx]);
           if (msg.action === 'validateScanTicket') return this.validateScanTicket(ticket);
-          return this.createScanJob(ticket);
+          return this.createScanJob(ticket, '', '');
         }
         case 'retrieveImageRequest':
           return this.retrieveImageRequest();
@@ -84,13 +106,13 @@ module.exports = function (RED) {
     }
 
     onStatus(status) {
-      this.log('-- onStatus: ' + status);
       switch(status) {
         case 'not listening':
           this.setStatus({fill: 'red', shape: 'ring', text: status});
           break;
         case 'listening':
           this.status({fill: 'green', shape: 'dot', text: status});
+          this.initScanService();
           break;
         case 'stopping':
           this.status({fill: 'yellow', shape: 'dot', text: status});
@@ -100,6 +122,26 @@ module.exports = function (RED) {
       }
     }
 
+    onEvent(event, data) {
+      switch(event) {
+        case 'ScanAvailableEvent': return this.onScanAvailableEvent(data);
+        case 'ScannerStatusSummaryEvent':
+          break;
+        case 'ScannerStatusConditionClearedEvent':
+          break;
+        case 'ScannerStatusConditionEvent':
+          break;
+      }
+      //TODO
+    }
+
+    initScanService() {
+      if (this.docDir) {
+        this.scanSubscribe('ScanAvailableEvent');
+      }
+    }
+
+    // IPDevice
     getXXX(){
       const devId = 'urn:uuid:16a65700-007c-1000-bb49-508140d0206b'; //???
       const pars = {
@@ -116,12 +158,11 @@ module.exports = function (RED) {
         }
       };
       return this.cfgNode.soapRequest(pars, (res) => {
-        this.log('-- getXXX');
         const resTemplate = { };
       });
     }
 
-    // Pritnt
+    // Print
     printSubscribe() {
       const service = 'd9529a80-208a-4b89-9317-5881fec6b809';
       const address = this.cfgNode.serviceUrl && (this.cfgNode.serviceUrl + service);
@@ -270,6 +311,7 @@ module.exports = function (RED) {
       };
     }
 
+    // Scan
     _scanSoapRequest(operation, soapHeader, soapBody, cb) {
       const endpoint = this.cfgNode.deviceUrl + 'wsd/scan';
       const pars = {
@@ -283,11 +325,16 @@ module.exports = function (RED) {
         soapBody,
         options: { 
           endpoint, 
-          forceSoap12Headers: true 
+          // stream: true,
+          parseReponseAttachments: true,
+          forceSoap12Headers: true
         }
       };
 
-      return this.cfgNode.soapRequest(pars, cb);
+      return this.cfgNode.soapRequest(pars, (res, attachments) => {
+        this.send({ output: soapBody, input: res });
+        if (cb) cb(res, attachments);
+      });
     }
 
     scanSubscribe(scanEvent) {
@@ -329,7 +376,7 @@ module.exports = function (RED) {
         },
         ScanDestinations: {
           ScanDestination: {
-            ClientDisplayName: 'Scan to RPi',
+            ClientDisplayName: 'Scan to ' + this.name,
             ClientContext: 'Scan'
           }
         }
@@ -338,17 +385,33 @@ module.exports = function (RED) {
         // To: this.cfgNode.scanEndpoint,
         Action: 'http://schemas.xmlsoap.org/ws/2004/08/eventing/Subscribe' // operations = ['Subscribe', 'DeliveryModes/Push', '']
       };
+      this.destinationTokens = {};
       return this._scanSoapRequest('Subscribe', soapHeader, SubscribeRequest, (res) => {
-        this.log('-- enter scanSubscribe callback');
-        const resTemplate = {
-          "SubscriptionManager": {
-            "Address": "http://192.168.193.209:8018/wsd/scan",
-            "ReferenceParameters": {
-              "Identifier": "uuid:0121e81d-004f-1001-af4b-35303a38313a"
-            }
-          },
-          "Expires": "PT1H"
+        // this.log('-- enter scanSubscribe callback');
+        // const resTemplate = {
+        //   "SubscriptionManager": {
+        //     "Address": "http://192.168.193.209:8018/wsd/scan",
+        //     "ReferenceParameters": {
+        //       "Identifier": "uuid:002bf4ca-00fc-100b-b51c-35303a38313a"
+        //     }
+        //   },
+        //   "Expires": "PT1H",
+        //   "DestinationResponses": {
+        //     "DestinationResponse": {
+        //       "ClientContext": "Scan",
+        //       "DestinationToken": "Client_9428399574248"
+        //     }
+        //   }
+        // };
+        const destResp = res && res.DestinationResponses &&  res.DestinationResponses.DestinationResponse;
+        if (destResp && destResp.ClientContext && destResp.DestinationToken) {
+          const expires = (res.Expires === 'PT1H') & (Date.now() + (60 * 60 * 1000)) || 0;
+          this.destinationTokens[destResp.ClientContext] = { 
+            token: destResp.DestinationToken,
+            expires //ISO 8601, (npm install iso8601-duration), (import { parse, end, toSeconds, pattern } from "iso8601-duration";), 
         };
+          this.log(`Set destination for '${destResp.ClientContext}': ${JSON.stringify(this.destinationTokens[destResp.ClientContext])}`);
+        }
       });
     }
 
@@ -360,7 +423,6 @@ module.exports = function (RED) {
       };
 
       return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
-        this.log('-- enter getScannerDescription callback');
         const resTemplate = {
           "ScannerElements": {
             "ElementData": [
@@ -391,7 +453,6 @@ module.exports = function (RED) {
         }
       };
       return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
-        this.log('-- enter getDefaultScanTicket callback');
         const resTemplate = {
           "ScannerElements": {
             "ElementData": [
@@ -478,7 +539,6 @@ module.exports = function (RED) {
       };
 
       return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
-        this.log('-- enter getScannerConfiguration callback');
         const resTemplate = {
           "ScannerElements": {
             "ElementData": [
@@ -628,7 +688,6 @@ module.exports = function (RED) {
         }
       };
       return this._scanSoapRequest('GetScannerElements', '', GetScannerElementsRequest, (res) => {
-        this.log('-- enter getScannerStatus callback');
         const resTemplate = {
           "ScannerElements": {
             "ElementData": [
@@ -702,7 +761,6 @@ module.exports = function (RED) {
         ScanTicket: ticket
       };
       return this._scanSoapRequest('ValidateScanTicket', '', ValidateScanTicketRequest, (res) => {
-        this.log('-- enter getScannerStatus callback');
         const resTemplate = {
           "ValidationInfo": {
             "ValidTicket": true,
@@ -718,86 +776,143 @@ module.exports = function (RED) {
       });
     }
 
-    createScanJob(ticket) {
-      const scanId = '583ea42a-8ab2-be4b-22b4-a7a46877aef5'; // from scan ScanAvailableEvent
+    createScanJob(ticket, scanId, token) {
       const CreateScanJobRequest = {
         ScanIdentifier: scanId,
-        DestinationToken: 'Client_2297848483138',
+        DestinationToken: token,
         ScanTicket: ticket
       };
 
-      // const res = {
-      //   CreateScanJobResponse: {
-      //     JobId: 42,
-      //     JobToken: 'ScanJob1',
-      //     ImageInformation: {
-      //       MediaFrontImageInfo: {
-      //         PixelsPerLine: 1700,
-      //         NumberOfLines: 2346,
-      //         BytesPerLine: 0
-      //       }
-      //     },
-      //     DocumentFinalParameters: {
-      //       Format: 'jfif</wscn:Format',
-      //       CompressionQualityFactor: 0,
-      //       ImagesToTransfer: 1,
-      //       InputSource: 'Platen',
-      //       ContentType: '',
-      //       InputSize: {
-      //         InputMediaSize: {
-      //           Width: 8503,
-      //           Height: 11732
-      //         }
-      //       },
-      //       Exposure: {
-      //         ExposureSettings: {
-      //           Contrast: 0,
-      //           Brightness: 0,
-      //           Sharpness: 0
-      //         }
-      //       },
-      //       Scaling: {
-      //         ScalingWidth: 100,
-      //         ScalingHeight: 100,
-      //       },
-      //       Rotation: 0,
-      //       MediaSides: {
-      //         MediaFront: {
-      //           ScanRegion: {
-      //             ScanRegionXOffset: 0,
-      //             ScanRegionYOffset: 0,
-      //             ScanRegionWidth: 8500,
-      //             ScanRegionHeight: 11730
-      //           },
-      //           ColorProcessing: 'RGB24',
-      //           Resolution: {
-      //             Width: 200,
-      //             Height: 200
-      //           }
-      //         }
-      //       }
-      //     }
-      //   }
-      // };
       return this._scanSoapRequest('CreateScanJob', '', CreateScanJobRequest, (res) => {
-        this.log('-- enter getScannerStatus callback');
         const resTemplate = {
+          "JobId": "49",
+          "JobToken": "ScanJob1",
+          "ImageInformation": {
+            "MediaFrontImageInfo": {
+              "PixelsPerLine": "1700",
+              "NumberOfLines": "2346",
+              "BytesPerLine": "0"
+            }
+          },
+          "DocumentFinalParameters": {
+            "Format": "jfif",
+            "CompressionQualityFactor": "0",
+            "ImagesToTransfer": "1",
+            "InputSource": "Platen",
+            "ContentType": null,
+            "InputSize": {
+              "InputMediaSize": {
+                "Width": "8503",
+                "Height": "11732"
+              }
+            },
+            "Exposure": {
+              "ExposureSettings": {
+                "Contrast": "0",
+                "Brightness": "0",
+                "Sharpness": "0"
+              }
+            },
+            "Scaling": {
+              "ScalingWidth": "100",
+              "ScalingHeight": "100"
+            },
+            "Rotation": "0",
+            "MediaSides": {
+              "MediaFront": {
+                "ScanRegion": {
+                  "ScanRegionXOffset": "0",
+                  "ScanRegionYOffset": "0",
+                  "ScanRegionWidth": "8500",
+                  "ScanRegionHeight": "11730"
+                },
+                "ColorProcessing": "RGB24",
+                "Resolution": {
+                  "Width": "200",
+                  "Height": "200"
+                }
+              }
+            }
+          }
         };
       });
     }
-
-    retrieveImageRequest() {
-      const req = {
-        RetrieveImageRequest: {
-          JobId: 42,
-          JobToken: ScanJob1,
-          DocumentDescription: {
-            DocumentName: 'Scanned image file for the WSD Scan Driver',
+  
+    retrieveImageRequest(job) {
+      const RetrieveImageRequest = {
+        JobId: '',
+        JobToken: '',
+        DocumentDescription: {
+          DocumentName: 'Scanned document for the ' + this.name,
+        },
+        ...job
+      };
+      return this._scanSoapRequest('RetrieveImage', '', RetrieveImageRequest, (res, att) => {
+        if (att && att.parts && Array.isArray(att.parts) && att.parts.length) {
+          //keys:body,headers
+          const headersRef = {
+            "content-type": "application/binary",
+            "content-id": "<1c696bd7-005a-48d9-9ee9-9adca11f8892@uuid>",
+            "content-transfer-encoding": "binary"
+          }
+          
+          if (att.parts[0].body) {
+            const img = att.parts[0].body;
+            //this.log(`-- img.length:${img.length}`);
+            const ts = new Date().toISOString().split(/\-|\:/).join('').replace("T", "_").substring(2, 15);
+            const docPath = path.join(this.cfgNode.cachePath, ts + '.jpg');
+            fs.createWriteStream(docPath).write(img, err => {
+              if (err) return this.error(`Save image failed:` + err);
+              this.log(`-- imgage saved to ${docPath}`);
+            });
           }
         }
-      };
-      const res = {
-      };
+
+        const resTemplate = {
+          "ScanData": { 
+            "Include": { 
+              "attributes": { 
+                "href": "cid:1c696bd7-005a-48d9-9ee9-9adca11f8892@uuid"
+              }
+            }
+          }
+        };
+      });
+      
+    }
+
+    onScanAvailableEvent(data) {
+      // data = {
+      //   ClientContext: 'Scan',
+      //   ScanIdentifier: '583ea42a-8ab2-be4b-22b4-a7a46877aef5',
+      //   InputSource: 'Platen'
+      // };
+      if (!data) return this.error(`ScanAvailableEvent contains no data '${data}'`);
+      if (!data.InputSource) return  this.error(`Missing 'InputSource' in ScanAvailableEvent data, ${JSON.stringify(data)}`);
+      if (!data.ScanIdentifier) return  this.error(`Missing 'ScanIdentifier' in ScanAvailableEvent data, ${JSON.stringify(data)}`);
+      if (!data.ClientContext) return  this.error(`Missing 'ClientContext' in ScanAvailableEvent data, ${JSON.stringify(data)}`);
+      const token = this.destinationTokens[data.ClientContext];
+      if (!token) return this.error(`No DestinationToken token for ClientContext '${data.ClientContext}' found`);
+      
+      //TODO use this.jobInformations
+      const ticket = this._getScanTicket(data.InputSource, data.InputSource && `Scanning from ${data.InputSource}..` || 'Scanning in auto mode..');
+      
+      this.validateScanTicket(ticket)
+        .then((data) => {
+          if (!data) return this.error(`ValidateScanTicket response contains no data '${data}'`);
+          if (!data.ValidationInfo) return  this.error(`Missing 'ValidationInfo' in ValidateScanTicket response, ${JSON.stringify(data)}`);
+          if (!data.ValidationInfo.ValidTicket) return  this.error(`Invalid ticket in ValidateScanTicket response, ${JSON.stringify(data)}`);
+          return this.createScanJob(ticket, data.ScanIdentifier, token);
+        })
+        .then((data) => {
+          if (!data) return this.error(`CreateScanJob response contains no data '${data}'`);
+          if (!data.JobId) return  this.error(`Missing 'JobId' in CreateScanJob response, ${JSON.stringify(data)}`);
+          if (!data.JobToken) return  this.error(`Missing 'JobToken' in CreateScanJob response, ${JSON.stringify(data)}`);
+          return this.retrieveImageRequest({ JobId: data.JobId, JobToken: data.JobToken });
+        })
+        .catch(err => {
+          this.log(err.stack || err); 
+        });
     }
   }
 

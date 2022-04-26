@@ -199,6 +199,36 @@
                    wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/SubscribeResponse" />
         </operation>
     </portType>
+    <portType name="IPToolType" wse:EventSource="true">
+        <operation name="ScanAvailableEvent">
+            <input message="wscn:ScanAvailableEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScanAvailableEvent" />
+        </operation>
+        <operation name="ScannerElementsChangeEvent">
+            <input message="wscn:ScannerElementsChangeEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerElementsChangeEvent" />
+        </operation>
+        <operation name="ScannerStatusSummaryEvent">
+            <input message="wscn:ScannerStatusSummaryEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusSummaryEvent" />
+        </operation>
+        <operation name="ScannerStatusConditionEvent">
+            <input message="wscn:ScannerStatusConditionEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionEvent" />
+        </operation>
+        <operation name="ScannerStatusConditionClearedEvent">
+            <input message="wscn:ScannerStatusConditionClearedEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionClearedEvent" />
+        </operation>
+        <operation name="JobStatusEvent">
+            <input message="wscn:JobStatusEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/JobStatusEvent" />
+        </operation>
+        <operation name="JobEndStateEvent">
+            <input message="wscn:JobEndStateEventMsg"
+                   wsa:Action="http://schemas.microsoft.com/windows/2006/08/wdp/scan/JobEndStateEvent" />
+        </operation>
+    </portType>
     <binding name="ScannerServiceBinding" type="wscn:ScannerServiceType">
         <wsoap12:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
         <wsp:PolicyReference URI="#ServicePolicy" />
@@ -358,9 +388,74 @@
             </output>
         </operation>
     </binding>
+    <binding name="IPToolBinding" type="wscn:IPToolType">
+        <wsoap12:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <wsp:PolicyReference URI="#ServicePolicy" />
+        <operation name="ScanAvailableEvent">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScanAvailableEvent"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+        <operation name="ScannerElementsChangeEvent">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerElementsChangeEvent"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+        <operation name="ScannerStatusSummaryEvent">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusSummaryEvent"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+        <operation name="ScannerStatusConditionEvent">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionEvent"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+        <operation name="ScannerStatusConditionClearedEvent">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/ScannerStatusConditionClearedEvent"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+        <operation name="JobStatusEvent">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/JobStatusEvent"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+        <operation name="JobEndStateEventMsg">
+            <wsoap12:operation
+                soapAction="http://schemas.microsoft.com/windows/2006/08/wdp/scan/JobEndStateEventMsg"
+                soapActionRequired="true" />
+            <output>
+                <wsoap12:body use="literal" />
+            </output>
+        </operation>
+    </binding>
     <service name="ScannerService">
         <port name="ScannerPort" binding="wscn:ScannerServiceBinding">
             <wsoap12:address location="http://localhost/ScannerService/"/>
+        </port>
+    </service>
+    <service name="IPToolService">
+        <port name="IPToolPort" binding="wscn:IPToolBinding">
+            <wsoap12:address location="http://localhost/IPToolService/"/>
         </port>
     </service>
 </definitions>

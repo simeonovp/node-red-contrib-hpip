@@ -4,7 +4,8 @@
     color: '#3FADB5',
     defaults: {
       cfg: { value: '', type: 'hpip-config' },
-      name: { value: '' }
+      name: { value: '' },
+      docDir: { value: '' }
     },          
     inputs: 1,
     outputs: 1,
@@ -28,12 +29,19 @@
     <input type="text" id="node-input-cfg">
   </div>
   <div class="form-row">
+    <label for="node-input-docDir"><i class="icon-tag"></i> Documents</label>
+    <input type="text" id="node-input-docDir" placeholder="Name">
+  </div>
+  <div class="form-row">
     <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-    <input type="text" id="node-input-name" placeholder="Name">
+    <input type="text" id="node-input-name">
   </div>
 </script>
 
 <!-- ======================= Help ======================= -->
 
 <script type="text/html" data-help-name="hpip-server">
+  <p><strong>Name:</strong><br/> The name of the tool device.</p>
+  <p><strong>Device:</strong><br/> The device configuration node.</p>
+  <p><strong>Documents:</strong><br/> Path to folder to save the scanned documents.</p>
 </script>
