@@ -864,6 +864,7 @@ module.exports = function (RED) {
             fs.createWriteStream(docPath).write(img, err => {
               if (err) return this.error(`Save image failed:` + err);
               this.log(`-- imgage saved to ${docPath}`);
+              this.flushCache(this.cfgNode.cachePath);
             });
           }
         }
@@ -878,7 +879,29 @@ module.exports = function (RED) {
           }
         };
       });
+    }
+
+    flushCache(cache) {
+      if (!this.docDir || !fs.existsSync(this.docDir)) return;
+      fs.readdir(cache, (err, files) => {
+        if (err) return this.error('Could not list the cache, ' + err);
       
+        files.forEach((file, index) => {
+          const fromPath = path.join(cache, file);
+          const toPath = path.join(this.docDir, file);
+      
+          fs.stat(fromPath, (error, stat) => {
+            if (error) return this.error('Error get file state, ' + error);
+            if (stat.isDirectory()) return this.log(`"${fromPath}" is a directory.'`);
+      
+            if (fs.existsSync(toPath)) return this.warn(`Target file "${toPath}" already exists`);
+            fs.rename(fromPath, toPath, (error) => {
+              if (error) return this.error('File moving error, ' + error);
+              this.log(`Moved file "${fromPath}" to "${toPath}"`);
+            });
+          });
+        });
+      });
     }
 
     onScanAvailableEvent(data) {

@@ -87,7 +87,8 @@ module.exports = function (RED) {
         if (err) return this.error(`Error on open WSDL in startScanServer: ${err}`);
         const options = { path, services, xml, uri: this.scanWsdl };
         const server = soap.listen(this.httpServer, options);
-        server.log = console.log; //--
+        //activate next line to allow server logs
+        // server.log = console.log;
         this.setStatus('listening');
       });        
     }
